@@ -1,7 +1,7 @@
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.9.5
-    container_name: zookeeper
+    container_name: zookeeper_twitch
     networks:
       - network1
     ports:
@@ -11,7 +11,7 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
   kafka:
     image: confluentinc/cp-kafka:7.9.5
-    container_name: kafka
+    container_name: kafka_twitch
     networks:
       - network1
     depends_on:
@@ -35,7 +35,7 @@ services:
 
   kafdrop:
     image: obsidiandynamics/kafdrop:4.2.0
-    container_name: kafdrop
+    container_name: kafdrop_twitch
     networks:
       - network1
     depends_on:

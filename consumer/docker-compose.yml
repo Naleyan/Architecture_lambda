@@ -3,7 +3,7 @@ services:
     build: .
     stdin_open: true # docker run -i
     tty: true        # docker run -t
-    container_name: consumer
+    container_name: consumer_twitch
     restart: "always"
     networks:
       - network1

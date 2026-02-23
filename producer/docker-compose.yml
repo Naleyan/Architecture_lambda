@@ -3,7 +3,7 @@ services:
     build: .
     stdin_open: true # docker run -i
     tty: true        # docker run -t
-    container_name: producer
+    container_name: producer_twitch
     ports:
       - '8000:8000'
     restart: "always"
