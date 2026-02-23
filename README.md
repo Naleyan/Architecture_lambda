@@ -14,3 +14,88 @@ Le cœur de notre dispositif commence par une phase d'ingestion robuste gérée 
 En parallèle, nous alimentons la "Batch layer" où les données brutes sont stockées de manière permanente sur Hadoop HDFS ou Amazon S3. Ici, nous utilisons Apache Spark  pour effectuer des calculs beaucoup plus lourds et précis sur l'historique complet des messages. Cette étape est cruciale car elle nous permet de corriger les approximations du temps réel et d'établir des profils de toxicité basés sur des semaines de logs, offrant ainsi une profondeur d'analyse impossible à obtenir en direct.
 
 Enfin, la convergence de ces deux analyses se fait au niveau de la "Serving layer" , où nous avons choisi Cassandra  pour stocker et fusionner les résultats. Cette base de données distribue ensuite les informations vers notre interface de visualisation (Visu). Grâce à cette structure, l'utilisateur final dispose d'un tableau de bord complet qui combine la vigilance du direct et la fiabilité des données historiques, garantissant une modération à la fois rapide et intelligente.
+
+
+
+## How to use
+
+### Using Docker Compose 
+You will need Docker installed to follow the next steps. To create and run the image use the following command:
+
+```bash
+bash TP2_start-kafka-producer-consumer.sh 
+```
+
+The configuration will create 3 clusters with 5 containers:
+
+- Consumer:
+   - Consumer container
+     - from python:3.11-alpine (version amd64 and arm64/v8)
+- Producer
+	- Publisher container
+	  - from python:3.11-alpine (version amd64 and arm64/v8) 
+- Kafka
+   - kafka container
+      - from confluentinc/cp-kafka:7.9.0 (version amd64 and arm64/v8)
+   - kafdrop container
+      - from obsidiandynamics/kafdrop:4.1.0 (version amd64 and arm64/v8)
+   - zookeeper container
+      - from confluentin/cp-zookeeper:7.9.0 (version amd64 and arm64/v8)
+
+container|Exposed ports
+---|---
+consumer|
+producer|8000
+kafdrop|19000:9000
+kafka|9091 9092
+zookeeper|2181
+
+The Publisher container sends data to Kafka.
+
+The Consumer container is a script that aims to wait and receive messages from Kafka.
+
+And the kafdrop container will provide acess to  web UI for viewing Kafka topics and browsing consumer groups that can be accessed at `http://localhost:19000`.
+
+Il faut ouvrir un terminal sur les containers producer et consumer puis lancer le programmer le programme python.
+
+```bash
+docker exec -ti producer_twitch sh
+```
+```bash
+cd app
+python producer.py
+```
+
+
+```bash
+docker exec -ti consumer_twitch sh
+```
+
+```bash
+cd app
+python consumer.py
+```
+
+## Project Structure
+Below is a project structure created:
+
+```
+cmd .
+├── README.md
+├── kafka
+│   ├── docker-compose.yml
+├── consumer
+│   ├── docker-compose.yml
+│   ├── Dockerfile
+│   ├── app
+│   │   ├── __init__.py
+│   │   └── TP2_consumer.py
+│   └── requirements.txt
+└── producer
+    ├── Dockerfile
+    ├── docker-compose.yml
+    ├── app
+    │   ├── __init__.py
+    │   ├── TP2_producer.py
+    └── requirements.txt
+```
