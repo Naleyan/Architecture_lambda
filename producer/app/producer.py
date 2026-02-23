@@ -15,9 +15,10 @@ def main():
     PORT = 6697  # TLS
     NICK = "marthah_h"
     TOKEN = "oauth:qc9wckdsq54mozcd1tfagoxl3bkg03"
-    CHANNEL = "#Sardoche"  # ex: #pokimane
+    STREAMER = "Kamet0"
+    CHANNEL = "#" + STREAMER  # ex: #pokimane
 
-    topic = 'twitch-chat' + CHANNEL
+    topic = 'twitch-chat-' + STREAMER
     num_partition = 1
     
     kafka_client = KafkaClient(bootstrap_servers='kafka:29092')
