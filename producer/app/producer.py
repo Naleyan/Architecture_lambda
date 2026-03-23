@@ -15,7 +15,7 @@ def main():
     PORT = 6697  # TLS
     NICK = "marthah_h"
     TOKEN = "oauth:qc9wckdsq54mozcd1tfagoxl3bkg03"
-    STREAMER = "Kamet0"
+    STREAMER =  "Locklear" #"Kamet0"
     CHANNEL = "#" + STREAMER  # ex: #pokimane
 
     topic = 'twitch-chat-' + STREAMER

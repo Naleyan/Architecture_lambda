@@ -15,7 +15,13 @@ En parallèle, nous alimentons la "Batch layer" où les données brutes sont sto
 
 Enfin, la convergence de ces deux analyses se fait au niveau de la "Serving layer" , où nous avons choisi Cassandra  pour stocker et fusionner les résultats. Cette base de données distribue ensuite les informations vers notre interface de visualisation (Visu). Grâce à cette structure, l'utilisateur final dispose d'un tableau de bord complet qui combine la vigilance du direct et la fiabilité des données historiques, garantissant une modération à la fois rapide et intelligente.
 
+# o L’architecture développée
+# o Les traitements appliqués sur chacun des modules
+# o Les liens entre les différents modules
+# o Le résultat obtenu
+# o Une analyse de celui-ci
 
+# Setup
 
 ## How to use
 
@@ -99,3 +105,83 @@ cmd .
     │   ├── TP2_producer.py
     └── requirements.txt
 ```
+
+
+
+
+# Lancement: 
+cd kafka 
+docker-compose up -d
+cd ../spark
+docker-compose up -d
+(si erreur pour worker-b ou a:
+docker-compose down --remove-orphans
+docker-compose up -d --build)
+
+cd ../consumer
+docker-compose up -d
+cd ../producer
+docker-compose up -d
+
+- (faire un fichier de lancement sh pour tout faire automatiquement)
+
+# Vérification bon lancement:
+docker ps
+
+## Affiche
+kafka_twitch
+zookeeper_twitch
+kafdrop_twitch
+spark-master
+spark-worker-a
+spark-worker-b
+consumer_twitch
+producer_twitch
+
+## Vérifier les interfaces graphique
+Kafka:
+http://localhost:19000/
+
+Spark:
+http://localhost:9090/
+
+# Kafka (connexion Twitch)
+## Docker
+Dans un terminal:
+cd producer
+docker logs -f producer_twitch
+-> Tout doit s'afficher en temps réel
+
+Dans un autre terminal:
+cd consumer
+docker logs -f consumer_twitch
+-> Tout doit s'afficher en temps réel
+
+## Kafdrop
+Aller dans le twitch-chat-STREAMER
+All Messages
+-> normalement ils sont tous là (Ajout en temps réel (actualiser))
+
+## En local
+data/twitch.json
+-> normalement ils sont tous là (Ajout en temps réel (actualiser))
+
+KAFKA OK
+
+# Spark
+
+## Spark Batch
+docker exec -it spark-master bash
+/opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  /opt/spark-apps/spark_batch.py
+
+Spark doit afficher les données brutes, top users, messages/minute, mot fréquents, state = FINISHED
+
+## Spark Streaming
+
+
+## Cassandra
+
+
+## Grafana

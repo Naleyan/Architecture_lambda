@@ -1,0 +1,61 @@
+services:
+  spark-master:
+    build: .
+    container_name: spark-master
+    networks:
+      - network1
+    ports:
+      - "9090:8080"   # UI Spark
+      - "7077:7077"   # master
+      - "4040:4040"   # jobs
+    volumes:
+      - ./apps:/opt/spark-apps
+      - ../data:/opt/spark-data
+    environment:
+      - SPARK_WORKLOAD=master
+      - SPARK_LOCAL_IP=spark-master
+      - SPARK_DRIVER_MEMORY=1G
+      - SPARK_EXECUTOR_MEMORY=1G
+
+  spark-worker-a:
+    build: .
+    container_name: spark-worker-a
+    networks:
+      - network1
+    depends_on:
+      - spark-master
+    ports:
+      - "9093:8080"
+    volumes:
+      - ./app:/opt/spark-apps
+      - ../data:/opt/spark-data
+    environment:
+      - SPARK_WORKLOAD=worker
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_LOCAL_IP=spark-worker-a
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
+
+  spark-worker-b:
+    build: .
+    container_name: spark-worker-b
+    networks:
+      - network1
+    depends_on:
+      - spark-master
+    ports:
+      - "9094:8080"
+    volumes:
+      - ./app:/opt/spark-apps
+      - ../data:/opt/spark-data
+    environment:
+      - SPARK_WORKLOAD=worker
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_LOCAL_IP=spark-worker-b
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
+
+networks:
+  network1:
+    name: mynetwork
+    external: true

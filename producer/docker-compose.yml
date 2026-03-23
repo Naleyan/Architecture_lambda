@@ -7,7 +7,7 @@ services:
     ports:
       - '8000:8000'
     restart: "always"
-    command: /bin/bash
+    command: python producer.py
     networks:
       - network1
     volumes:

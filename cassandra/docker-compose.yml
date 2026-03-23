@@ -1,0 +1,15 @@
+services:
+  cassandra:
+    image: cassandra:4.1
+    container_name: cassandra_twitch
+    ports:
+      - "9042:9042"
+    networks:
+      - network1
+    environment:
+      - CASSANDRA_CLUSTER_NAME=TwitchCluster
+
+networks:
+  network1:
+    name: mynetwork
+    external: true

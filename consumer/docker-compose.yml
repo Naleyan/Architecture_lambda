@@ -9,6 +9,8 @@ services:
       - network1
     volumes:
       - ./app:/consumer/app
+      - ../data:/data
+    command: python /consumer/app/consumer.py
 
 networks:
   network1:
