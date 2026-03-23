@@ -107,7 +107,8 @@ cmd .
 ```
 
 
-
+# Changer de streamer
+Copier coller le pseudo du STREAMER dans consumer, producer
 
 # Lancement: 
 cd kafka 

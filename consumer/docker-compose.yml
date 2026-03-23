@@ -10,7 +10,9 @@ services:
     volumes:
       - ./app:/consumer/app
       - ../data:/data
-    command: python /consumer/app/consumer.py
+    command: python consumer.py
+    environment:
+      - PYTHONUNBUFFERED=1
 
 networks:
   network1:
