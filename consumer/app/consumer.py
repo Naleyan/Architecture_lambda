@@ -75,7 +75,7 @@ def consumer_from_kafka(topic):
 
 def main():
     print("Démarrage du consumer...")
-    STREAMER = "Locklear"
+    STREAMER = "jynxzi"
     topic = "twitch-chat-" + STREAMER
 
     kafka_ready = False

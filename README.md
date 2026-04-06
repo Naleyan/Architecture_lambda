@@ -108,7 +108,7 @@ cmd .
 
 
 # Changer de streamer
-Copier coller le pseudo du STREAMER dans consumer, producer
+Copier coller le pseudo du STREAMER dans consumer, producer (bien prendre le pseudo dans l'url pour être sur)
 
 # Lancement: 
 cd kafka 
@@ -180,9 +180,42 @@ docker exec -it spark-master bash
 Spark doit afficher les données brutes, top users, messages/minute, mot fréquents, state = FINISHED
 
 ## Spark Streaming
+rm -rf /opt/spark-apps/checkpoints/ (si déjà lancé avant)
+
+/opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1 \
+  /opt/spark-apps/kafka_spark_streaming.py
+
 
 
 ## Cassandra
+(Batch)
+/opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --packages com.datastax.spark:spark-cassandra-connector_2.13:3.5.1 \
+  /opt/spark-apps/twitch_batch_layer.py
 
+
+(Streaming)
+rm -rf /opt/spark-apps/checkpoints/
+docker exec -it spark-master bash
+
+/opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1,com.datastax.spark:spark-cassandra-connector_2.13:3.5.1 \
+  /opt/spark-apps/twitch_speed_layer.py
+
+
+docker exec -it cassandra_twitch cqlsh
+
+
+(Batch)
+USE twitch;
+DESCRIBE TABLES;
+SELECT * FROM batch_global_stats;
+SELECT * FROM streaming_toxic_users;
 
 ## Grafana
+admin
+grafana_twitch

@@ -1,0 +1,16 @@
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana_twitch
+    ports:
+      - "3000:3000"
+    environment:
+      # Installation automatique du plugin gratuit pour Cassandra
+      - GF_INSTALL_PLUGINS=hadesarchitect-cassandra-datasource
+    networks:
+      - network1
+
+networks:
+  network1:
+    name: mynetwork
+    external: true

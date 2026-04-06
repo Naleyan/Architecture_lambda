@@ -14,7 +14,7 @@ def main():
     PORT = 6697  # TLS
     NICK = "marthah_h"
     TOKEN = "oauth:qc9wckdsq54mozcd1tfagoxl3bkg03"
-    STREAMER = "Locklear"
+    STREAMER = "jynxzi"
     CHANNEL = "#" + STREAMER
     topic = 'twitch-chat-' + STREAMER
     num_partition = 1

@@ -1,90 +1,12 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
+import os
 
-
-# 1. Création session Spark
+# =============================
+# 1. Spark Session
+# =============================
 spark = SparkSession.builder \
-    .appName("Twitch Batch Analysis") \
-    .getOrCreate()
-
-# 2. Lecture du fichier JSON
-df = spark.read.json("/opt/spark-data/twitch.json")
-
-print("=== Données brutes ===")
-df.show(5)
-
-# 3. Nettoyage / typage
-df = df.withColumn("timestamp", to_timestamp(col("timestamp")))
-
-# supprimer lignes vides
-df = df.filter(col("user").isNotNull())
-
-# 4. ANALYSES
-
-# -----------------------------
-# 🔹 Top utilisateurs
-# -----------------------------
-print("\n=== Top utilisateurs ===")
-
-top_users = df.groupBy("user") \
-    .agg(count("*").alias("nb_messages")) \
-    .orderBy(desc("nb_messages"))
-
-top_users.show(10)
-
-
-# -----------------------------
-# 🔹 Nombre total de messages
-# -----------------------------
-print("\n=== Nombre total de messages ===")
-total = df.count()
-print(f"Total messages : {total}")
-
-
-# -----------------------------
-# 🔹 Messages par utilisateur (simple)
-# -----------------------------
-print("\n=== Messages par utilisateur ===")
-df.groupBy("user").count().show()
-
-
-# -----------------------------
-# 🔹 Messages par minute
-# -----------------------------
-
-print("\n=== Messages par minute ===")
-
-messages_per_min = df.groupBy(
-    window(col("timestamp"), "1 minute")
-).count()
-
-messages_per_min.show(truncate=False)
-
-
-# -----------------------------
-# 🔹 Mots les plus fréquents
-# -----------------------------
-
-print("\n=== Mots les plus fréquents ===")
-
-words = df.select(
-    explode(
-        split(lower(col("message")), " ")
-    ).alias("word")
-)
-
-top_words = words.groupBy("word") \
-    .count() \
-    .orderBy(desc("count"))
-
-top_words.show(10)
-
-# -----------------------------
-# 🔹 Cassandra
-# -----------------------------
-
-spark = SparkSession.builder \
-    .appName("Twitch-Spark-Cassandra") \
+    .appName("Twitch Batch Final Analysis") \
     .master("spark://spark-master:7077") \
     .config("spark.jars.packages",
             "com.datastax.spark:spark-cassandra-connector_2.13:3.5.1") \
@@ -92,19 +14,98 @@ spark = SparkSession.builder \
     .config("spark.cassandra.connection.port", "9042") \
     .getOrCreate()
 
-df = spark.read.json("/data/twitch.json")
+# =============================
+# 2. Lecture données
+# =============================
+"""df = spark.read.json("/opt/spark-data/twitch.json")
 
-df_users = df.groupBy("user").count()
+# Nettoyage
+df = df.withColumn("timestamp", to_timestamp(col("timestamp")))
+df = df.filter(col("user").isNotNull())
+"""
+parquet_path = "/opt/spark-data/twitch_parquet"
 
+if not os.path.exists(parquet_path):
+    print("Création Parquet...")
+    df_raw = spark.read.json("/opt/spark-data/twitch.json")
+    df_raw.write.mode("overwrite").parquet(parquet_path)
+
+df = spark.read.parquet(parquet_path)
+
+print("=== Données ===")
+df.show(5)
+
+# =============================
+# 3. ANALYSE GLOBALE
+# =============================
+
+# -----------------------------
+# 🔹 Nombre total de messages
+# -----------------------------
+total_messages = df.count()
+print(f"\nTotal messages : {total_messages}")
+
+# -----------------------------
+# 🔹 Messages par utilisateur
+# -----------------------------
+messages_per_user = df.groupBy("user") \
+    .agg(count("*").alias("nb_messages"))
+
+print("\n=== Messages par utilisateur ===")
+messages_per_user.show()
+
+# -----------------------------
+# 🔹 Moyenne messages / utilisateur
+# -----------------------------
+avg_messages = messages_per_user.agg(
+    avg("nb_messages").alias("moyenne_messages")
+)
+
+print("\n=== Moyenne messages par utilisateur ===")
+avg_messages.show()
+
+# -----------------------------
+# 🔹 Top utilisateurs
+# -----------------------------
+top_users = messages_per_user.orderBy(desc("nb_messages"))
+
+print("\n=== Top utilisateurs ===")
+top_users.show(10)
+
+# -----------------------------
+# 🔹 Mots les plus fréquents
+# -----------------------------
+words = df.select(
+    explode(
+        split(
+            regexp_replace(lower(col("message")), "[^a-zA-Z0-9 ]", ""),
+            " "
+        )
+    ).alias("word")
+).filter(col("word") != "")
+
+top_words = words.groupBy("word") \
+    .count() \
+    .orderBy(desc("count"))
+
+print("\n=== Mots les plus fréquents ===")
+top_words.show(20)
+
+# =============================
+# 4. STOCKAGE CASSANDRA
+# =============================
+
+# Table messages brute
 df.write \
     .format("org.apache.spark.sql.cassandra") \
     .options(table="messages", keyspace="twitch") \
     .mode("append") \
     .save()
 
-df_users \
+# Table stats utilisateurs
+messages_per_user \
     .withColumn("timestamp", current_timestamp()) \
-    .withColumnRenamed("count", "value") \
+    .withColumnRenamed("nb_messages", "value") \
     .withColumn("metric", lit("messages_per_user")) \
     .write \
     .format("org.apache.spark.sql.cassandra") \
@@ -112,5 +113,18 @@ df_users \
     .mode("append") \
     .save()
 
+# Table top mots
+top_words \
+    .withColumn("timestamp", current_timestamp()) \
+    .withColumnRenamed("count", "value") \
+    .withColumn("metric", lit("top_words")) \
+    .write \
+    .format("org.apache.spark.sql.cassandra") \
+    .options(table="stats", keyspace="twitch") \
+    .mode("append") \
+    .save()
+
+# =============================
 # 5. Fin
+# =============================
 spark.stop()
