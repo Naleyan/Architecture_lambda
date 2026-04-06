@@ -5,7 +5,6 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Installation automatique du plugin gratuit pour Cassandra
       - GF_INSTALL_PLUGINS=hadesarchitect-cassandra-datasource
     networks:
       - network1

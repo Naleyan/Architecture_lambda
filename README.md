@@ -1,221 +1,156 @@
-# Toxicité des messages dans le tchat des streamers sur twitch
+# Analyse de la Toxicité sur Twitch - Architecture Lambda
 
+Ce projet déploie une infrastructure Big Data complète pour capter, analyser et stocker en temps réel (et en différé) les messages des chats Twitch afin d'en évaluer l'activité et le niveau de toxicité.
 
-# Toxicité des messages dans le tchat des streamers sur twitch
+Stack Technique : Docker, Apache Kafka, Apache Spark (Batch & Streaming), Cassandra, Grafana.
 
-## Contexte
+# Structure du Projet
 
-Nous avons choisi de nous attaquer à une problématique majeure du web actuel : la toxicité dans les tchats Twitch. Avec des millions d'utilisateurs échangeant en direct, les flux de données provenant de l'extérieur sont massifs et souvent imprévisibles. En tant qu'étudiants en data science, notre objectif est de concevoir un système capable non seulement de détecter les insultes, mais aussi d'analyser les comportements malveillants sur le long terme pour aider les créateurs à protéger leur communauté.
-
-C’est la première fois que nous mettons en œuvre une Architecture Lambda, et ce modèle nous a semblé idéal pour répondre aux contraintes de Twitch. Le défi technique réside dans la dualité du traitement : il faut être capable de réagir en quelques millisecondes pour modérer un message (vitesse), tout en étant capable de traiter des téraoctets de données historiques pour repérer des harceleurs récurrents (précision). L’architecture Lambda nous permet de ne pas sacrifier l’un pour l’autre en séparant le travail en deux circuits complémentaires.
-
-Le cœur de notre dispositif commence par une phase d'ingestion robuste gérée par Apache Kafka. Kafka agit comme une plateforme de distribution qui reçoit les logs de tchats Twitch et les redirige simultanément vers nos deux couches de calcul. Pour la partie réactive, nous utilisons la "Real time layer" basée sur Spark Streaming. Cette couche traite les messages par micro-lots pour identifier immédiatement les pics de toxicité ou les mots interdits, permettant une mise à jour rapide des indicateurs de modération.
-
-En parallèle, nous alimentons la "Batch layer" où les données brutes sont stockées de manière permanente sur Hadoop HDFS ou Amazon S3. Ici, nous utilisons Apache Spark  pour effectuer des calculs beaucoup plus lourds et précis sur l'historique complet des messages. Cette étape est cruciale car elle nous permet de corriger les approximations du temps réel et d'établir des profils de toxicité basés sur des semaines de logs, offrant ainsi une profondeur d'analyse impossible à obtenir en direct.
-
-Enfin, la convergence de ces deux analyses se fait au niveau de la "Serving layer" , où nous avons choisi Cassandra  pour stocker et fusionner les résultats. Cette base de données distribue ensuite les informations vers notre interface de visualisation (Visu). Grâce à cette structure, l'utilisateur final dispose d'un tableau de bord complet qui combine la vigilance du direct et la fiabilité des données historiques, garantissant une modération à la fois rapide et intelligente.
-
-# o L’architecture développée
-# o Les traitements appliqués sur chacun des modules
-# o Les liens entre les différents modules
-# o Le résultat obtenu
-# o Une analyse de celui-ci
-
-# Setup
-
-## How to use
-
-### Using Docker Compose 
-You will need Docker installed to follow the next steps. To create and run the image use the following command:
-
-```bash
-bash TP2_start-kafka-producer-consumer.sh 
-```
-
-The configuration will create 3 clusters with 5 containers:
-
-- Consumer:
-   - Consumer container
-     - from python:3.11-alpine (version amd64 and arm64/v8)
-- Producer
-	- Publisher container
-	  - from python:3.11-alpine (version amd64 and arm64/v8) 
-- Kafka
-   - kafka container
-      - from confluentinc/cp-kafka:7.9.0 (version amd64 and arm64/v8)
-   - kafdrop container
-      - from obsidiandynamics/kafdrop:4.1.0 (version amd64 and arm64/v8)
-   - zookeeper container
-      - from confluentin/cp-zookeeper:7.9.0 (version amd64 and arm64/v8)
-
-container|Exposed ports
----|---
-consumer|
-producer|8000
-kafdrop|19000:9000
-kafka|9091 9092
-zookeeper|2181
-
-The Publisher container sends data to Kafka.
-
-The Consumer container is a script that aims to wait and receive messages from Kafka.
-
-And the kafdrop container will provide acess to  web UI for viewing Kafka topics and browsing consumer groups that can be accessed at `http://localhost:19000`.
-
-Il faut ouvrir un terminal sur les containers producer et consumer puis lancer le programmer le programme python.
-
-```bash
-docker exec -ti producer_twitch sh
-```
-```bash
-cd app
-python producer.py
-```
-
-
-```bash
-docker exec -ti consumer_twitch sh
-```
-
-```bash
-cd app
-python consumer.py
-```
-
-## Project Structure
-Below is a project structure created:
-
-```
-cmd .
+.
 ├── README.md
-├── kafka
-│   ├── docker-compose.yml
-├── consumer
+├── data/
+│   ├── twitch.json
+│   └── twitch_parquet/
+├── cassandra/
+│   └── docker-compose.yml
+├── grafana/
+│   └── docker-compose.yml
+├── kafka/
+│   └── docker-compose.yml
+├── consumer/
 │   ├── docker-compose.yml
 │   ├── Dockerfile
-│   ├── app
-│   │   ├── __init__.py
-│   │   └── TP2_consumer.py
-│   └── requirements.txt
-└── producer
-    ├── Dockerfile
-    ├── docker-compose.yml
-    ├── app
-    │   ├── __init__.py
-    │   ├── TP2_producer.py
-    └── requirements.txt
-```
+│   ├── requirements.txt
+│   └── app/
+│       └── consumer.py
+├── producer/
+│   ├── docker-compose.yml
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── requirements_kafka.txt
+│   └── app/
+│       └── producer.py
+└── spark/
+│   ├── app\checkpoints/
+│   ├── docker-compose.yml
+│   ├── Dockerfile
+│   ├── start-spark.sh
+│   └── apps/
+│        ├── checkpoints/
+│        ├── spark_batch.py
+│        ├── kafka_spark_streaming.py
+│        ├── twitch_batch_layer.py
+│        └── twitch_speed_layer.py
 
+# Configuration : Changer de Streamer
 
-# Changer de streamer
-Copier coller le pseudo du STREAMER dans consumer, producer (bien prendre le pseudo dans l'url pour être sur)
+Avant de lancer l'infrastructure, vous pouvez choisir la chaîne Twitch à analyser.
 
-# Lancement: 
+- Allez dans les fichiers du consumer et du producer.
+
+   Remplacez le nom du streamer dans le code (utilisez exactement le pseudo tel qu'il apparaît dans l'URL Twitch, en minuscules).
+
+- Allez dans le fichier du speed layer, lors du setup de df_kafka pour se subscribe au bon topic.
+
+# Lancement de l'Infrastructure (Docker)
+
+Lancez les différents modules dans cet ordre précis pour respecter les dépendances :
+Bash
+
+## 1. Lancer Kafka et Zookeeper
 cd kafka 
 docker-compose up -d
+
+## 2. Lancer le cluster Spark
 cd ../spark
 docker-compose up -d
-(si erreur pour worker-b ou a:
-docker-compose down --remove-orphans
-docker-compose up -d --build)
+### Note : Si erreur sur les workers, utilisez : docker-compose down --remove-orphans && docker-compose up -d --build
 
+## 3. Lancer l'ingestion de données
 cd ../consumer
 docker-compose up -d
 cd ../producer
 docker-compose up -d
 
-- (faire un fichier de lancement sh pour tout faire automatiquement)
+- Pensez à créer un script start.sh à la racine du projet pour automatiser cette séquence de lancement.
 
-# Vérification bon lancement:
+# Vérification du démarrage
+
+Pour vérifier que tous les conteneurs tournent correctement :
+
 docker ps
 
-## Affiche
-kafka_twitch
-zookeeper_twitch
-kafdrop_twitch
-spark-master
-spark-worker-a
-spark-worker-b
-consumer_twitch
-producer_twitch
+Vous devriez voir les conteneurs suivants actifs : kafka_twitch, zookeeper_twitch, kafdrop_twitch, spark-master, spark-worker-a, spark-worker-b, consumer_twitch, producer_twitch, et cassandra_twitch.
+## Interfaces Graphiques
 
-## Vérifier les interfaces graphique
-Kafka:
-http://localhost:19000/
+   - Kafdrop (Gestion Kafka) : http://localhost:19000/
 
-Spark:
-http://localhost:9090/
+   - Spark UI (Suivi des Jobs) : http://localhost:9090/
 
-# Kafka (connexion Twitch)
-## Docker
-Dans un terminal:
-cd producer
-docker logs -f producer_twitch
--> Tout doit s'afficher en temps réel
+   - Grafana (Visualisation) : http://localhost:3000/ (Login: admin / admin)
 
-Dans un autre terminal:
-cd consumer
-docker logs -f consumer_twitch
--> Tout doit s'afficher en temps réel
+# Validation de l'Ingestion (Kafka)
 
-## Kafdrop
-Aller dans le twitch-chat-STREAMER
-All Messages
--> normalement ils sont tous là (Ajout en temps réel (actualiser))
+Vérifiez que la donnée circule bien en temps réel :
 
-## En local
-data/twitch.json
--> normalement ils sont tous là (Ajout en temps réel (actualiser))
+   - Côté Producer (Captation Twitch) :
 
-KAFKA OK
+    docker logs -f producer_twitch
 
-# Spark
+   - Côté Consumer (Sauvegarde locale JSON) :
 
-## Spark Batch
+    docker logs -f consumer_twitch
+
+   - Dans Kafdrop : Naviguez vers le topic twitch-chat-<streamer> > View Messages pour vérifier que les données brutes arrivent bien.
+
+   - En local : Vérifiez que le fichier data/twitch.json se remplit bien.
+
+# Traitements Big Data (Spark & Cassandra)
+
+Connectez-vous au conteneur Spark Master pour exécuter les jobs :
+
 docker exec -it spark-master bash
-/opt/spark/bin/spark-submit \
-  --master spark://spark-master:7077 \
-  /opt/spark-apps/spark_batch.py
 
-Spark doit afficher les données brutes, top users, messages/minute, mot fréquents, state = FINISHED
+## Batch Layer (Traitement de l'historique)
 
-## Spark Streaming
-rm -rf /opt/spark-apps/checkpoints/ (si déjà lancé avant)
-
-/opt/spark/bin/spark-submit \
-  --master spark://spark-master:7077 \
-  --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1 \
-  /opt/spark-apps/kafka_spark_streaming.py
+Ce job lit le JSON, le convertit en Parquet, calcule les statistiques globales et sauvegarde dans Cassandra.
 
 
-
-## Cassandra
-(Batch)
 /opt/spark/bin/spark-submit \
   --master spark://spark-master:7077 \
   --packages com.datastax.spark:spark-cassandra-connector_2.13:3.5.1 \
   /opt/spark-apps/twitch_batch_layer.py
 
+## Speed Layer (Traitement en Temps Réel)
 
-(Streaming)
+Ce job lit Kafka en direct, applique les règles de détection de toxicité, et fait des "upserts" dans Cassandra.
+
+   - Avant chaque relance d'un job Streaming, nettoyez les checkpoints pour éviter les erreurs de désynchronisation d'état :
+   
 rm -rf /opt/spark-apps/checkpoints/
-docker exec -it spark-master bash
+
 
 /opt/spark/bin/spark-submit \
   --master spark://spark-master:7077 \
   --packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.0.1,com.datastax.spark:spark-cassandra-connector_2.13:3.5.1 \
   /opt/spark-apps/twitch_speed_layer.py
 
+## Exploration des données (Cassandra)
 
+Pour vérifier les tables générées et interroger la base de données :
+Bash
+
+### Entrer dans le conteneur Cassandra
 docker exec -it cassandra_twitch cqlsh
 
+Commandes CQL utiles :
+SQL
 
-(Batch)
 USE twitch;
 DESCRIBE TABLES;
-SELECT * FROM batch_global_stats;
-SELECT * FROM streaming_toxic_users;
 
-## Grafana
-admin
-grafana_twitch
+-- Voir les résultats Batch
+SELECT * FROM batch_global_stats;
+
+-- Voir les résultats Streaming (Toxicité)
+SELECT * FROM streaming_toxic_users;

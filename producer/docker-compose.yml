@@ -1,8 +1,8 @@
 services:
   producer:
     build: .
-    stdin_open: true # docker run -i
-    tty: true        # docker run -t
+    stdin_open: true 
+    tty: true        
     container_name: producer_twitch
     ports:
       - '8000:8000'

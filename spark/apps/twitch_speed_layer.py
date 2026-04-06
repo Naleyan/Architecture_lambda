@@ -9,13 +9,13 @@ def setup_cassandra():
     clstr = Cluster(['cassandra']) 
     session = clstr.connect()
     
-    # 1. Keyspace
+    # Keyspace
     session.execute("""
         CREATE KEYSPACE IF NOT EXISTS twitch 
         WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
     """) 
     
-    # 2. Table : Activité globale temporelle
+    # Activité globale 
     session.execute("""
         CREATE TABLE IF NOT EXISTS twitch.streaming_global_activity (
             window_start timestamp PRIMARY KEY,
@@ -23,7 +23,7 @@ def setup_cassandra():
         );
     """) 
 
-    # 3. Table : Top utilisateurs temps réel
+    # Top utilisateurs 
     session.execute("""
         CREATE TABLE IF NOT EXISTS twitch.streaming_user_activity (
             user text PRIMARY KEY,
@@ -31,7 +31,7 @@ def setup_cassandra():
         );
     """) 
 
-    # 4. Table : Activité toxique temporelle
+    # Activité toxique 
     session.execute("""
         CREATE TABLE IF NOT EXISTS twitch.streaming_toxic_activity (
             window_start timestamp PRIMARY KEY,
@@ -39,7 +39,7 @@ def setup_cassandra():
         );
     """) 
 
-    # 5. Table : Utilisateurs toxiques
+    # Utilisateurs toxiques
     session.execute("""
         CREATE TABLE IF NOT EXISTS twitch.streaming_toxic_users (
             user text PRIMARY KEY,
@@ -49,14 +49,8 @@ def setup_cassandra():
     print("Schéma Cassandra prêt pour les 4 métriques.")
 
 def main():
-    # =============================
-    # 1. Préparer Cassandra
-    # =============================
     setup_cassandra()
 
-    # =============================
-    # 2. Configuration Spark
-    # =============================
     scala_version = '2.13'
     spark_version = '4.0.1' 
     cassandra_version = '3.5.1' 
@@ -77,9 +71,6 @@ def main():
 
     spark.sparkContext.setLogLevel("ERROR")
 
-    # =============================
-    # 3. Lecture Kafka
-    # =============================
     df_kafka = spark.readStream \
         .format("kafka") \
         .option("kafka.bootstrap.servers", "kafka:29092") \
@@ -87,9 +78,6 @@ def main():
         .option("startingOffsets", "earliest") \
         .load()
 
-    # =============================
-    # 4. Traitement & Nettoyage
-    # =============================
     schema = StructType() \
         .add("user", StringType()) \
         .add("message", StringType()) \
@@ -98,44 +86,39 @@ def main():
     df = df_kafka.selectExpr("CAST(value AS STRING)") \
         .select(from_json(col("value"), schema).alias("data")) \
         .select("data.*") \
-        .withColumn("timestamp", current_timestamp()) # Correction temporelle
+        .withColumn("timestamp", current_timestamp()) 
 
-    # Toxicité via regex
+    # Toxicité 
     toxic_words = ["idiot", "noob", "trash", "stupid", "hate"]
     regex_pattern = "(?i)\\b(" + "|".join(toxic_words) + ")\\b"
     df_clean = df.withColumn("is_toxic", col("message").rlike(regex_pattern))
 
     df_watermarked = df_clean.withWatermark("timestamp", "10 seconds")
 
-    # =============================
-    # 5. LES 4 AGREGATIONS (Préparées pour Cassandra)
-    # =============================
+    # Calcul des métriques dans des fenêtres de 10 secondes 
     
-    # M1. Activité globale (extraction de window.start et cast en int)
+    # Activité globale 
     global_activity = df_watermarked.groupBy(window(col("timestamp"), "10 seconds")) \
         .agg(count("*").cast("int").alias("total_messages")) \
         .select(col("window.start").alias("window_start"), col("total_messages"))
 
-    # M2. Suivi des utilisateurs
+    # Suivi des utilisateurs
     user_activity = df_watermarked.groupBy("user") \
         .agg(count("*").cast("int").alias("nb_messages"))
 
-    # M3. Activité toxique globale
+    # Activité toxique globale
     toxic_activity = df_watermarked.filter(col("is_toxic") == True) \
         .groupBy(window(col("timestamp"), "10 seconds")) \
         .agg(count("*").cast("int").alias("total_toxic_messages")) \
         .select(col("window.start").alias("window_start"), col("total_toxic_messages"))
 
-    # M4. Utilisateurs toxiques
+    # Utilisateurs toxiques
     toxic_users = df_watermarked.filter(col("is_toxic") == True) \
         .groupBy("user") \
         .agg(count("*").cast("int").alias("nb_toxic_messages"))
 
-    # =============================
-    # 6. ECRITURE VERS CASSANDRA
-    # =============================
+    # CASSANDRA
     
-    # Fonction dynamique pour écrire dans n'importe quelle table
     def write_to_cassandra(table_name):
         def _writer(writeDF, epochId):
             writeDF.write \
@@ -147,7 +130,6 @@ def main():
 
     print("Démarrage des 4 flux Speed Layer vers Cassandra...")
 
-    # On utilise le mode "update" pour tout le monde (Cassandra fera des upserts par clé primaire)
     query1 = global_activity.writeStream \
         .outputMode("update") \
         .foreachBatch(write_to_cassandra("streaming_global_activity")) \

@@ -4,18 +4,16 @@ from pyspark.sql.functions import col, count, desc, explode, split, lower, regex
 from cassandra.cluster import Cluster
 
 def setup_cassandra():
-    """Initialisation automatique du schéma Cassandra"""
-    print("Initialisation du schéma Cassandra...")
+    print("Initialisation Cassandra...")
     clstr = Cluster(['cassandra']) 
     session = clstr.connect()
-    
-    # 1. Keyspace
+
     session.execute("""
         CREATE KEYSPACE IF NOT EXISTS twitch 
         WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
     """) 
     
-    # 2. Table : Top utilisateurs
+    # Top utilisateurs
     session.execute("""
         CREATE TABLE IF NOT EXISTS twitch.batch_top_users (
             user text PRIMARY KEY,
@@ -23,7 +21,7 @@ def setup_cassandra():
         );
     """) 
     
-    # 3. Table : Top mots
+    # Top mots
     session.execute("""
         CREATE TABLE IF NOT EXISTS twitch.batch_top_words (
             word text PRIMARY KEY,
@@ -31,19 +29,17 @@ def setup_cassandra():
         );
     """)
     
-    # 4. Table : Statistiques globales (changé en 'double' pour gérer la moyenne)
+    # Statistiques globales
     session.execute("""
         CREATE TABLE IF NOT EXISTS twitch.batch_global_stats (
             metric_name text PRIMARY KEY,
             value double
         );
     """)
-    print("Schéma Cassandra prêt.")
+    print("Cassandra prêt.")
 
 def main():
-    # =============================
-    # 1. Préparation
-    # =============================
+
     setup_cassandra()
 
     spark = SparkSession.builder \
@@ -56,36 +52,26 @@ def main():
 
     spark.sparkContext.setLogLevel("ERROR")
 
-    # =============================
-    # 2. Ingestion & Nettoyage (Parquet)
-    # =============================
     parquet_path = "/opt/spark-data/twitch_parquet"
 
-    print("Mise à jour du Data Lake : Conversion du JSON brut en Parquet...")
-    # On lit le JSON avec les 46 000 messages (et plus)
+    print("Conversion JSON -> Parquet")
+
     df_raw = spark.read.json("/opt/spark-data/twitch.json")
     
-    # On écrase l'ancien Parquet avec les nouvelles données
+
     df_raw.write.mode("overwrite").parquet(parquet_path)
 
-    print("Lecture depuis le Data Lake (Parquet)...")
     df = spark.read.parquet(parquet_path)
 
-    # Nettoyage de base
     df = df.withColumn("timestamp", to_timestamp(col("timestamp")))
     df = df.filter(col("user").isNotNull())
 
     print("\n=== Aperçu des données ===")
     df.show(5)
 
-    # =============================
-    # 3. ANALYSES & ÉCRITURE CASSANDRA
-    # =============================
 
-    # -----------------------------
-    # A. Top Utilisateurs
-    # -----------------------------
-    print("Calcul et sauvegarde : Top Utilisateurs...")
+    # Top Utilisateurs
+    print("Top Utilisateurs")
     messages_per_user = df.groupBy("user") \
         .agg(count("*").cast("int").alias("nb_messages"))
     
@@ -95,13 +81,12 @@ def main():
         .mode("append") \
         .save()
 
-    # Affichage Console
+
     messages_per_user.orderBy(desc("nb_messages")).show(10)
 
-    # -----------------------------
-    # B. Mots les plus fréquents
-    # -----------------------------
-    print("Calcul et sauvegarde : Top Mots...")
+
+    # Mots les plus fréquents
+    print("Top Mots")
     words = df.select(
         explode(
             split(regexp_replace(lower(col("message")), "[^a-zA-Z0-9 ]", ""), " ")
@@ -111,7 +96,7 @@ def main():
     top_words = words.groupBy("word") \
         .agg(count("*").cast("int").alias("count")) \
         .orderBy(desc("count")) \
-        .limit(100) # On garde le top 100 pour ne pas surcharger Cassandra
+        .limit(100) 
 
     top_words.write \
         .format("org.apache.spark.sql.cassandra") \
@@ -119,13 +104,10 @@ def main():
         .mode("append") \
         .save()
     
-    # Affichage Console
+
     top_words.show(10)
 
-    # -----------------------------
-    # C. Statistiques Globales
-    # -----------------------------
-    print("Calcul et sauvegarde : Statistiques Globales...")
+    print("Statistiques Globales")
     
     # Total messages
     total_messages = df.count()
@@ -137,7 +119,6 @@ def main():
     print(f"Total messages : {total_messages}")
     print(f"Moyenne messages/user : {avg_messages:.2f}")
 
-    # Création d'un mini DataFrame pour Cassandra
     global_stats_data = [
         ("total_messages", float(total_messages)),
         ("average_messages_per_user", avg_messages)
@@ -150,10 +131,7 @@ def main():
         .mode("append") \
         .save()
 
-    # =============================
-    # 4. Fin
-    # =============================
-    print("\n✅ Job Batch terminé avec succès et données sauvegardées dans Cassandra !")
+    print("\nBatch terminé dans Cassandra")
     spark.stop()
 
 if __name__ == "__main__":

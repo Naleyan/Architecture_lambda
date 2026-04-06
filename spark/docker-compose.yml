@@ -5,9 +5,9 @@ services:
     networks:
       - network1
     ports:
-      - "9090:8080"   # UI Spark
-      - "7077:7077"   # master
-      - "4040:4040"   # jobs
+      - "9090:8080"   
+      - "7077:7077"   
+      - "4040:4040"   
     volumes:
       - ./apps:/opt/spark-apps
       - ../data:/opt/spark-data
