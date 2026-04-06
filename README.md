@@ -5,7 +5,7 @@ Ce projet déploie une infrastructure Big Data complète pour capter, analyser e
 Stack Technique : Docker, Apache Kafka, Apache Spark (Batch & Streaming), Cassandra, Grafana.
 
 # Structure du Projet
-
+```Plaintext
 .
 ├── README.md
 ├── data/
@@ -41,6 +41,7 @@ Stack Technique : Docker, Apache Kafka, Apache Spark (Batch & Streaming), Cassan
 │        ├── kafka_spark_streaming.py
 │        ├── twitch_batch_layer.py
 │        └── twitch_speed_layer.py
+```
 
 # Configuration : Changer de Streamer
 
